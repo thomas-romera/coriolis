@@ -99,8 +99,18 @@ class HorizontalRail ( Rail ):
         return '<HorizontalRail "{}" ({}) @{}>'.format( self.side.getRailNet(self.order).getName()
                                                       , self.order
                                                       , DbU.getValueString(self.axis) )
+
+    def isConnectable ( self, contact ):
+        railNet      = self.side.getRailNet(self.order)
+        trace( 550, '\tHorizontalRail.isConnectable() [{}] @{}\n'.format(self.order,DbU.getValueString(self.axis)) )
+        trace( 550, '\t  {}\n'.format(contact) )
+        if railNet != contact.getNet():
+            trace( 550, f'\t  Reject {contact} different net {railNet}\n' )
+            return False
+        return True
+
     def isReachable ( self, contact ):
-        trace( 550, ',+', '\tTry to connect to: {}\n'.format(self) )
+        trace( 550, ',+', '\tHorizontalRail.isReachable(): {}\n'.format(self) )
         trace( 550, '\tContact {}\n'.format(contact) )
         contactBb = contact.getBoundingBox()
         if    contactBb.getXMin() < self.side.innerBb.getXMin() \
@@ -223,11 +233,21 @@ class VerticalRail ( Rail ):
                            , self.side.vRailWidth
                            )
 
+    def isConnectable ( self, contact ):
+        railNet      = self.side.getRailNet(self.order)
+        trace( 550, '\tVerticalRail.isConnectable() [{}] @{}\n'.format(self.order,DbU.getValueString(self.axis)) )
+        trace( 550, '\t  {}\n'.format(contact) )
+        if railNet != contact.getNet():
+            trace( 550, f'\t  Reject {contact} different net {railNet}\n' )
+            return False
+        return True
+
     def isReachable ( self, contact ):
         railDepth    = self.conf.routingGauge.getLayerDepth( self.side.getVLayer() )
         contactDepth = self.conf.routingGauge.getLayerDepth( contact.getLayer() )
         contactBb    = contact.getBoundingBox()
         contactAbove = True if contactDepth > railDepth else False
+        contactBb    = contact.getBoundingBox()
         if    contactBb.getYMin() < self.side.innerBb.getYMin() \
            or contactBb.getYMax() > self.side.innerBb.getYMax():
             # XXX turn this into a non-fatal case. ERROR is still printed,
@@ -235,9 +255,8 @@ class VerticalRail ( Rail ):
             print (ErrorMessage( 1, [ '{} is outside rail/corona Y range'.format(contact)
                                    , 'power pad is likely to be to far off north or south.'
                                    , '(core:{})'.format(self.side.innerBb) ] ) )
-        if contact.getY() in self.vias: return False
         trace( 550, ',+', '\tVerticalRail.isReachable() [{}] @{}\n'.format(self.order,DbU.getValueString(self.axis)) )
-        trace( 550, '\t{}\n'.format(contact) )
+        if contact.getY() in self.vias: return False
         keys = list( self.vias.keys() )
         keys.sort()
         insertIndex = bisect.bisect_left( keys, contact.getY() )
@@ -245,8 +264,8 @@ class VerticalRail ( Rail ):
         for key in keys:
             trace( 550, ' {}'.format(DbU.getValueString(key)) )
         trace( 550, '\n' )
-
         if len(keys) > 0:
+            minSpacing = self.side.getVLayer().getMinimalSpacing() * 4
             if insertIndex < len(keys):
                 insertPosition = keys[ insertIndex ]
                 trace( 550, '\tinsertIndex:{}\n'.format(insertIndex) )
@@ -259,7 +278,7 @@ class VerticalRail ( Rail ):
                     print( ErrorMessage( 1, [ '{} neither above nor below' \
                                               .format( self.vias[insertPosition][1] ) ] ))
                 trace( 550, '\tcontactAbove={} bigviaAbove={}\n'.format( contactAbove, bigviaAbove ))
-                if contactBb.getYMax() >= self.vias[insertPosition][1].getBoundingBox(railDepth).getYMin() \
+                if contactBb.getYMax() + minSpacing >= self.vias[insertPosition][1].getBoundingBox(railDepth).getYMin() \
                    and not xor(contactAbove,bigviaAbove):
                     trace( 550, ',--', '\tReject {} intersect NEXT\n'.format(contact) )
                     return False
@@ -274,7 +293,7 @@ class VerticalRail ( Rail ):
                     print( ErrorMessage( 1, [ '{} neither above nor below' \
                                               .format( self.vias[insertPosition][1] ) ] ))
                 trace( 550, '\tcontactAbove={} bigviaAbove={}\n'.format( contactAbove, bigviaAbove ))
-                if self.vias[insertPosition][1].getBoundingBox(railDepth).getYMax() >= contactBb.getYMin() \
+                if self.vias[insertPosition][1].getBoundingBox(railDepth).getYMax() + minSpacing >= contactBb.getYMin() \
                    and not xor(contactAbove,bigviaAbove):
                     trace( 550, ',--', '\tReject {} intersect PREVIOUS\n'.format(contact) )
                     return False
@@ -382,23 +401,30 @@ class Side ( object ):
         for terminal in blockSide.terminals:
             trace( 550, '\tterminal:{}\n'.format(terminal) )
             for rail in self.rails:
+                trace( 550, ',+', f'\tConnect to rail {rail}\n' )
                 if not rail.isReachable( terminal[1] ):
+                    trace( 550, '-,' )
                     break
-                rail.connect( terminal[1] )
+                if rail.isConnectable( terminal[1] ):
+                    rail.connect( terminal[1] )
+                trace( 550, '-,' )
 
     def getRailRange ( self, net ):
         if net.isClock(): return range(len(self.rails))
         if not net.isSupply(): return []
+        railsNb = len( self.rails )
         if self.side & HORIZONTAL:
-            trace( 550, '\tHorizontal rail.\n' )
-            return range( len(self.coronaCks), len(self.rails) )
+            trace( 550, f'\tgetRailRange() for {net} Horizontal rail.\n' )
+            return range( railsNb )
         else:
-            trace( 550, '\tVertical rail.\n' )
+            trace( 550, f'\tgetRailRange() for {net} Vertical rail.\n' )
             trace( 550, '\t{} > {}\n'.format(self.horizontalDepth,self.verticalDepth) )
             if self.horizontalDepth > self.verticalDepth:
-                return range( len(self.coronaCks), len(self.rails) )
+                railIndexes = range( railsNb )
+                trace( 550, f'\t  -> range={railIndexes}\n' )
+                return railIndexes
         trace( 550, '\tUsing half rails only.\n' )
-        return range( len(self.coronaCks) + len(self.rails)//2 - 2, len(self.rails) )
+        return range( railsNb//2, railsNb )
 
     def connectPads ( self, padSide ):
        #for contact in padSide.pins:

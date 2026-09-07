@@ -1304,8 +1304,10 @@ namespace {
   //if (_cell->getName() == "AOI221X1_V5")
   //if (_cell->getName() == "gf180mcu_fd_sc_mcu9t5v0__addh_1")
   //if (_cell->getName() == "gf180mcu_fd_sc_mcu9t5v0__clkbuf_2")
-    if (_cell->getName() == "AOI2110")
-      DebugSession::open( 100, 110 );
+  //if (_cell->getName() == "AOI2110")
+  //if (_cell->getName() == "CLKBU12")
+  //if (_cell->getName() == "IMUS2X1_V5")
+  //   DebugSession::open( 100, 110 );
     cdebug_log(100,1) << "LefParser::_pinStdPostProcess" << endl;
 
     for ( auto element : _pinComponents ) {
@@ -1503,8 +1505,10 @@ namespace {
   //if (_cell->getName() == "AOI221X1_V5")
   //if (_cell->getName() == "gf180mcu_fd_sc_mcu9t5v0__addh_1")
   //if (_cell->getName() == "gf180mcu_fd_sc_mcu9t5v0__clkbuf_2")
-    if (_cell->getName() == "AOI2110")
-      DebugSession::close();
+  //if (_cell->getName() == "AOI2110")
+  //if (_cell->getName() == "CLKBU12")
+  //if (_cell->getName() == "IMUS2X1_V5")
+  //  DebugSession::close();
   }
 
 
